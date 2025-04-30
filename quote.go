@@ -45,7 +45,7 @@ func handleQuote(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, arg
 		parts := strings.Fields(m.Body)
 		if len(parts) > 0 {
 			if strings.HasPrefix(parts[0], "@") {
-				parts[0] = parseNick(parts[0])
+				parts[0] = parseNick(parts[0]) + ":"
 			}
 		}
 		lines[i] = fmt.Sprintf("<%s> %s", m.Sender, strings.Join(parts, " "))

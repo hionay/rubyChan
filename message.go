@@ -18,9 +18,9 @@ const cmdPrefix = "!"
 const helpText = `Commands:
 !g <query>					- Search Google for <query>
 !weather <location>			- Show current weather for <location>
-!calc <expr>				- Evaluate a math expression (e.g. 2+3*4)
-!roulette					- Russian roulette (1/6 chance of dying)
-!remindme in <dur> <msg>	- Remind you after a duration, e.g. in 15m take a break
+!calc <expr>					- Evaluate a math expression (e.g. 2+3*4)
+!roulette						- Russian roulette (1/6 chance of dying)
+!remindme in <dur> <msg>		- Remind you after a duration, e.g. in 15m take a break
 !remindme list				- List pending reminders
 !remindme cancel <id>		- Cancel a reminder
 !quote N <comment?>			- Quote the last N messages, optionally with a comment

@@ -36,10 +36,7 @@ func parseMessage(cli *mautrix.Client, cfg *Config, st time.Time) func(context.C
 	return func(ctx context.Context, evt *event.Event) {
 		msg := evt.Content.AsMessage()
 		raw := strings.TrimSpace(msg.Body)
-		nick := string(evt.Sender)
-		if i := strings.Index(nick, ":"); i > 0 {
-			nick = nick[1:i]
-		}
+		nick := parseNick(string(evt.Sender))
 		hist := msgHistory[evt.RoomID]
 		hist = append(hist, Message{Sender: nick, Body: raw})
 		if len(hist) > 100 {
@@ -107,6 +104,15 @@ func messageWithMention(
 	if _, err := cli.SendMessageEvent(ctx, roomID, event.EventMessage, content); err != nil {
 		log.Printf("SendMessageEvent error: %v", err)
 	}
+}
+
+func parseNick(name string) string {
+	if i := strings.Index(name, ":"); i > 0 {
+		nick := strings.Clone(name)
+		nick = nick[1:i]
+		return nick
+	}
+	return name
 }
 
 func handleCalc(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, args []string) {

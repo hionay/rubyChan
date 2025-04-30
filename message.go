@@ -21,6 +21,8 @@ const helpText = `Commands:
 !calc <expr>        		- Evaluate a math expression (e.g. 2+3*4)
 !roulette           		- Russian roulette (1/6 chance of dying)
 !remindme in <dur> <msg>    - Remind you after a duration, e.g. in 15m take a break
+!remindme list				- List pending reminders
+!remindme cancel <id>		- Cancel a reminder
 !quote N <comment?> 		- Quote the last N messages, optionally with a comment
 !help               		- Show this help message
 `
@@ -74,7 +76,13 @@ func parseMessage(cli *mautrix.Client, cfg *Config, st time.Time) func(context.C
 			handleRoulette(ctx, cli, evt.RoomID, evt.Sender)
 
 		case "remindme":
-			handleRemindMe(ctx, cli, evt.RoomID, evt.Sender, args)
+			if len(args) == 1 && args[0] == "list" {
+				handleRemindList(ctx, cli, evt.RoomID, evt.Sender)
+			} else if len(args) == 2 && args[0] == "cancel" {
+				handleRemindCancel(ctx, cli, evt.RoomID, evt.Sender, args[1])
+			} else {
+				handleRemindIn(ctx, cli, evt.RoomID, evt.Sender, args)
+			}
 
 		case "quote":
 			handleQuote(ctx, cli, evt.RoomID, args)
@@ -132,29 +140,6 @@ func handleCalc(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, args
 		return
 	}
 	cli.SendText(ctx, roomID, fmt.Sprintf("%v", res))
-}
-
-func handleRemindMe(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, sender id.UserID, args []string) {
-	if len(args) < 3 || args[0] != "in" {
-		cli.SendText(ctx, roomID, "Usage: !remindme in <duration> <message>")
-		return
-	}
-	dur, err := time.ParseDuration(args[1])
-	if err != nil {
-		cli.SendText(ctx, roomID, "Invalid duration (e.g. 15m, 1h30m)")
-		return
-	}
-	reminder := strings.Join(args[2:], " ")
-	go func() {
-		select {
-		case <-time.After(dur):
-		case <-ctx.Done():
-			log.Printf("Reminder cancelled for %s", sender)
-			return
-		}
-		messageWithMention(ctx, cli, roomID, sender, "⏰ Reminder: "+reminder)
-	}()
-	messageWithMention(ctx, cli, roomID, sender, fmt.Sprintf("👍 Got it, I'll remind you in %s", args[1]))
 }
 
 func handleGoogle(ctx context.Context, cli *mautrix.Client, cfg *Config, roomID id.RoomID, args []string) {

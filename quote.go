@@ -43,9 +43,12 @@ func handleQuote(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, arg
 	lines := make([]string, n)
 	for i, m := range slice {
 		parts := strings.Fields(m.Body)
-		if len(parts) > 0 {
-			if strings.HasPrefix(parts[0], "@") {
-				parts[0] = parseNick(parts[0]) + ":"
+		for i := range parts {
+			if strings.HasPrefix(parts[i], "@") {
+				parts[i] = parseNick(parts[i])
+				if i == 0 {
+					parts[i] += ":"
+				}
 			}
 		}
 		lines[i] = fmt.Sprintf("<%s> %s", m.Sender, strings.Join(parts, " "))

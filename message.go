@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -75,7 +74,7 @@ func parseMessage(cli *mautrix.Client, cfg *Config, st time.Time) func(context.C
 			handleCalc(ctx, cli, evt.RoomID, args)
 
 		case "roulette":
-			handleRoulette(ctx, cli, evt.RoomID)
+			handleRoulette(ctx, cli, evt.RoomID, evt.Sender)
 
 		case "remindme":
 			handleRemindMe(ctx, cli, evt.RoomID, evt.Sender, args)
@@ -86,6 +85,27 @@ func parseMessage(cli *mautrix.Client, cfg *Config, st time.Time) func(context.C
 		case "help":
 			cli.SendText(ctx, evt.RoomID, helpText)
 		}
+	}
+}
+
+func messageWithMention(
+	ctx context.Context,
+	cli *mautrix.Client,
+	roomID id.RoomID,
+	mentioned id.UserID,
+	msg string,
+) {
+	mention := fmt.Sprintf(
+		`<a href="https://matrix.to/#/%s">%s</a>`, mentioned, mentioned,
+	)
+	content := event.MessageEventContent{
+		MsgType:       event.MsgText,
+		Body:          fmt.Sprintf("%s: %s", mentioned, msg),
+		Format:        event.FormatHTML,
+		FormattedBody: fmt.Sprintf("%s: %s", mention, msg),
+	}
+	if _, err := cli.SendMessageEvent(ctx, roomID, event.EventMessage, content); err != nil {
+		log.Printf("SendMessageEvent error: %v", err)
 	}
 }
 
@@ -108,22 +128,6 @@ func handleCalc(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, args
 	cli.SendText(ctx, roomID, fmt.Sprintf("%v", res))
 }
 
-func handleRoulette(ctx context.Context, cli *mautrix.Client, roomID id.RoomID) {
-	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
-	chamber := rnd.Intn(6) + 1
-
-	var reply string
-	if chamber == 1 {
-		reply = `💥 Bang! You’re dead.`
-	} else {
-		reply = "click... you survived."
-	}
-
-	if _, err := cli.SendText(ctx, roomID, reply); err != nil {
-		log.Printf("SendText error (roulette): %v", err)
-	}
-}
-
 func handleRemindMe(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, sender id.UserID, args []string) {
 	if len(args) < 3 || args[0] != "in" {
 		cli.SendText(ctx, roomID, "Usage: !remindme in <duration> <message>")
@@ -142,20 +146,9 @@ func handleRemindMe(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, 
 			log.Printf("Reminder cancelled for %s", sender)
 			return
 		}
-		mention := fmt.Sprintf(
-			`<a href="https://matrix.to/#/%s">%s</a>`, sender, sender,
-		)
-		content := event.MessageEventContent{
-			MsgType:       event.MsgText,
-			Body:          fmt.Sprintf("⏰ Reminder for %s: %s", sender, reminder),
-			Format:        event.FormatHTML,
-			FormattedBody: fmt.Sprintf("⏰ Reminder for %s: %s", mention, reminder),
-		}
-		if _, err := cli.SendMessageEvent(ctx, roomID, event.EventMessage, content); err != nil {
-			log.Printf("SendMessageEvent error (remindme): %v", err)
-		}
+		messageWithMention(ctx, cli, roomID, sender, "⏰ Reminder: "+reminder)
 	}()
-	cli.SendText(ctx, roomID, fmt.Sprintf("👍 Got it, I'll remind you in %s", args[1]))
+	messageWithMention(ctx, cli, roomID, sender, fmt.Sprintf("👍 Got it, I'll remind you in %s", args[1]))
 }
 
 func handleGoogle(ctx context.Context, cli *mautrix.Client, cfg *Config, roomID id.RoomID, args []string) {

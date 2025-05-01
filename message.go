@@ -18,6 +18,7 @@ const cmdPrefix = "!"
 const helpText = `Commands:
 !g <query>					- Search Google for <query>
 !weather <location>			- Show current weather for <location>
+!joke						- Tell a random joke
 !calc <expr>					- Evaluate a math expression (e.g. 2+3*4)
 !roulette						- Russian roulette (1/6 chance of dying)
 !remindme in <dur> <msg>		- Remind you after a duration, e.g. in 15m take a break
@@ -68,6 +69,9 @@ func parseMessage(cli *mautrix.Client, cfg *Config, st time.Time) func(context.C
 
 		case "weather":
 			handleWeather(ctx, cli, cfg, evt.RoomID, args)
+
+		case "joke":
+			handleJoke(ctx, cli, evt.RoomID)
 
 		case "calc":
 			handleCalc(ctx, cli, evt.RoomID, args)
@@ -178,4 +182,13 @@ func handleWeather(ctx context.Context, cli *mautrix.Client, cfg *Config, roomID
 		return
 	}
 	cli.SendText(ctx, roomID, reply)
+}
+
+func handleJoke(ctx context.Context, cli *mautrix.Client, roomID id.RoomID) {
+	joke, err := fetchJoke()
+	if err != nil {
+		cli.SendText(ctx, roomID, fmt.Sprintf("error: %v", err))
+		return
+	}
+	cli.SendText(ctx, roomID, joke)
 }

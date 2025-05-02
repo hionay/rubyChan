@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -13,7 +14,9 @@ import (
 	"time"
 
 	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/crypto/cryptohelper"
 	"maunium.net/go/mautrix/event"
+	"modernc.org/sqlite"
 
 	"github.com/hionay/rubyChan/command"
 	"github.com/hionay/rubyChan/command/calc"
@@ -26,6 +29,10 @@ import (
 	"github.com/hionay/rubyChan/command/weather"
 	"github.com/hionay/rubyChan/history"
 )
+
+func init() {
+	sql.Register("sqlite3-fk-wal", &sqlite.Driver{})
+}
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -48,26 +55,12 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("mautrix.NewClient(%q): %w", cfg.MatrixServer, err)
 	}
 
-	resp, err := cli.Login(ctx, &mautrix.ReqLogin{
-		Type: mautrix.AuthTypePassword,
-		Identifier: mautrix.UserIdentifier{
-			User: cfg.MatrixUsername,
-			Type: mautrix.IdentifierTypeUser,
-		},
-		Password:         cfg.MatrixPassword,
-		StoreCredentials: true,
-	})
-	if err != nil {
-		return fmt.Errorf("cli.Login(): %w", err)
-	}
-	log.Printf("Logged in as %s", resp.UserID)
-
-	store := history.NewHistoryStore(100)
+	historyStore := history.NewHistoryStore(100)
 	command.Register(
 		&calc.CalcCmd{},
 		&command.HelpCmd{},
 		&joke.JokeCmd{},
-		&quote.QuoteCmd{History: store},
+		&quote.QuoteCmd{History: historyStore},
 		&reminder.RemindMeCmd{},
 		&roulette.RouletteCmd{},
 		&search.SearchCmd{GoogleAPIKey: cfg.GoogleAPIKey, GoogleCX: cfg.GoogleCX},
@@ -77,7 +70,7 @@ func run(ctx context.Context) error {
 
 	startTime := time.Now()
 	syncer := cli.Syncer.(*mautrix.DefaultSyncer)
-	syncer.OnEventType(event.EventMessage, parseMessage(cli, cfg, startTime, store))
+	syncer.OnEventType(event.EventMessage, parseMessage(cli, cfg, startTime, historyStore))
 	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
 		if evt.GetStateKey() == cli.UserID.String() && evt.Content.AsMember().Membership == event.MembershipInvite {
 			_, err := cli.JoinRoomByID(ctx, evt.RoomID)
@@ -96,6 +89,26 @@ func run(ctx context.Context) error {
 			log.Printf("Joined room %s: %s", evt.RoomID, content.Name)
 		}
 	})
+
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(cli, []byte("meow"), "crypto.db")
+	if err != nil {
+		return fmt.Errorf("cryptohelper.NewCryptoHelper(): %w", err)
+	}
+
+	cryptoHelper.LoginAs = &mautrix.ReqLogin{
+		Type: mautrix.AuthTypePassword,
+		Identifier: mautrix.UserIdentifier{
+			User: cfg.MatrixUsername,
+			Type: mautrix.IdentifierTypeUser,
+		},
+		Password:         cfg.MatrixPassword,
+		StoreCredentials: true,
+	}
+	if err := cryptoHelper.Init(ctx); err != nil {
+		return fmt.Errorf("cryptoHelper.Init(): %w", err)
+	}
+	cli.Crypto = cryptoHelper
+	log.Printf("Logged in as %s", cli.UserID)
 
 	srv := newWebhookServer(cli, cfg.WebhookAddr)
 	go func() {

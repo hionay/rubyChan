@@ -68,9 +68,8 @@ func run(ctx context.Context) error {
 		&repo.RepoCmd{},
 	)
 
-	startTime := time.Now()
 	syncer := cli.Syncer.(*mautrix.DefaultSyncer)
-	syncer.OnEventType(event.EventMessage, parseMessage(cli, cfg, startTime, historyStore))
+	syncer.OnEventType(event.EventMessage, parseMessage(cli, historyStore))
 	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
 		if evt.GetStateKey() == cli.UserID.String() && evt.Content.AsMember().Membership == event.MembershipInvite {
 			_, err := cli.JoinRoomByID(ctx, evt.RoomID)

@@ -15,7 +15,8 @@ import (
 
 const cmdPrefix = "!"
 
-func parseMessage(cli *mautrix.Client, cfg *Config, st time.Time, store *history.HistoryStore) func(context.Context, *event.Event) {
+func parseMessage(cli *mautrix.Client, store *history.HistoryStore) func(context.Context, *event.Event) {
+	st := time.Now()
 	return func(ctx context.Context, evt *event.Event) {
 		raw := strings.TrimSpace(evt.Content.AsMessage().Body)
 		nick := parseNick(string(evt.Sender))

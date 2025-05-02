@@ -19,6 +19,7 @@ import (
 	"github.com/hionay/rubyChan/command/joke"
 	"github.com/hionay/rubyChan/command/quote"
 	"github.com/hionay/rubyChan/command/reminder"
+	"github.com/hionay/rubyChan/command/repo"
 	"github.com/hionay/rubyChan/command/roulette"
 	"github.com/hionay/rubyChan/command/search"
 	"github.com/hionay/rubyChan/command/weather"
@@ -70,6 +71,7 @@ func run(ctx context.Context) error {
 		&roulette.RouletteCmd{},
 		&search.SearchCmd{GoogleAPIKey: cfg.GoogleAPIKey, GoogleCX: cfg.GoogleCX},
 		&weather.WeatherCmd{WeatherAPIKey: cfg.WeatherAPIKey},
+		&repo.RepoCmd{},
 	)
 
 	startTime := time.Now()

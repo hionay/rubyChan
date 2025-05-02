@@ -1,20 +1,45 @@
-package main
+package weather
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
+
+	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/event"
 )
 
-func searchWeather(cfg *Config, location string) (string, error) {
-	if cfg.WeatherAPIKey == "" {
-		return "", fmt.Errorf("WEATHER_API_KEY not set")
-	}
+type WeatherCmd struct {
+	WeatherAPIKey string
+}
 
+func (*WeatherCmd) Name() string      { return "weather" }
+func (*WeatherCmd) Aliases() []string { return []string{"w"} }
+func (*WeatherCmd) Usage() string {
+	return "!weather <location> - Show current weather for <location>"
+}
+
+func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+	if len(args) == 0 {
+		cli.SendText(ctx, evt.RoomID, "Usage: "+wc.Usage())
+		return
+	}
+	loc := strings.Join(args, " ")
+	reply, err := getWeatherOfLocation(wc.WeatherAPIKey, loc)
+	if err != nil {
+		cli.SendText(ctx, evt.RoomID, fmt.Sprintf("️error: %v", err))
+		return
+	}
+	cli.SendText(ctx, evt.RoomID, reply)
+}
+
+func getWeatherOfLocation(apiKey string, location string) (string, error) {
 	endpoint := fmt.Sprintf(
 		"https://api.weatherapi.com/v1/current.json?key=%s&q=%s&aqi=no",
-		cfg.WeatherAPIKey,
+		apiKey,
 		url.QueryEscape(location),
 	)
 

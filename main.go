@@ -13,6 +13,16 @@ import (
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
+
+	"github.com/hionay/rubyChan/command"
+	"github.com/hionay/rubyChan/command/calc"
+	"github.com/hionay/rubyChan/command/joke"
+	"github.com/hionay/rubyChan/command/quote"
+	"github.com/hionay/rubyChan/command/reminder"
+	"github.com/hionay/rubyChan/command/roulette"
+	"github.com/hionay/rubyChan/command/search"
+	"github.com/hionay/rubyChan/command/weather"
+	"github.com/hionay/rubyChan/history"
 )
 
 func main() {
@@ -50,9 +60,21 @@ func run(ctx context.Context) error {
 	}
 	log.Printf("Logged in as %s", resp.UserID)
 
+	store := history.NewHistoryStore(100)
+	command.Register(
+		&calc.CalcCmd{},
+		&command.HelpCmd{},
+		&joke.JokeCmd{},
+		&quote.QuoteCmd{History: store},
+		&reminder.RemindMeCmd{},
+		&roulette.RouletteCmd{},
+		&search.SearchCmd{GoogleAPIKey: cfg.GoogleAPIKey, GoogleCX: cfg.GoogleCX},
+		&weather.WeatherCmd{WeatherAPIKey: cfg.WeatherAPIKey},
+	)
+
 	startTime := time.Now()
 	syncer := cli.Syncer.(*mautrix.DefaultSyncer)
-	syncer.OnEventType(event.EventMessage, parseMessage(cli, cfg, startTime))
+	syncer.OnEventType(event.EventMessage, parseMessage(cli, cfg, startTime, store))
 	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
 		if evt.GetStateKey() == cli.UserID.String() && evt.Content.AsMember().Membership == event.MembershipInvite {
 			_, err := cli.JoinRoomByID(ctx, evt.RoomID)

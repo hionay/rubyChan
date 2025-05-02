@@ -1,10 +1,29 @@
-package main
+package joke
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/event"
 )
+
+type JokeCmd struct{}
+
+func (*JokeCmd) Name() string      { return "joke" }
+func (*JokeCmd) Aliases() []string { return []string{} }
+func (*JokeCmd) Usage() string     { return "!joke - Tell a random joke" }
+
+func (*JokeCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+	joke, err := fetchJoke()
+	if err != nil {
+		cli.SendText(ctx, evt.RoomID, fmt.Sprintf("error: %v", err))
+		return
+	}
+	cli.SendText(ctx, evt.RoomID, joke)
+}
 
 func fetchJoke() (string, error) {
 	const url = "https://v2.jokeapi.dev/joke/Programming"

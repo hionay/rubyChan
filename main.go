@@ -90,7 +90,7 @@ func run(ctx context.Context) error {
 		}
 	})
 
-	cryptoHelper, err := cryptohelper.NewCryptoHelper(cli, []byte("meow"), "crypto.db")
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(cli, []byte("onay"), "db/crypto.db")
 	if err != nil {
 		return fmt.Errorf("cryptohelper.NewCryptoHelper(): %w", err)
 	}

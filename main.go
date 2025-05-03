@@ -20,6 +20,7 @@ import (
 
 	"github.com/hionay/rubyChan/command"
 	"github.com/hionay/rubyChan/command/calc"
+	"github.com/hionay/rubyChan/command/fact"
 	"github.com/hionay/rubyChan/command/joke"
 	"github.com/hionay/rubyChan/command/quote"
 	"github.com/hionay/rubyChan/command/reminder"
@@ -66,6 +67,7 @@ func run(ctx context.Context) error {
 		&search.SearchCmd{GoogleAPIKey: cfg.GoogleAPIKey, GoogleCX: cfg.GoogleCX},
 		&weather.WeatherCmd{WeatherAPIKey: cfg.WeatherAPIKey},
 		&repo.RepoCmd{},
+		&fact.FactCmd{},
 	)
 
 	syncer := cli.Syncer.(*mautrix.DefaultSyncer)

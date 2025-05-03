@@ -19,3 +19,4 @@ In time, I'll add more features, but for now, it's just a simple bot.
 - `!quote <N> [comment]` — Quote the last N messages and post to our quotes API
 - `!help` — Show available commands
 - `!repo` - Displays the public Github Repo for the Bot's codebase
+- `!fact` - Get today's useless fact

@@ -20,3 +20,4 @@ In time, I'll add more features, but for now, it's just a simple bot.
 - `!help` — Show available commands
 - `!repo` - Displays the public Github Repo for the Bot's codebase
 - `!fact` - Get today's useless fact
+- `!poll <question> | <option1> | <option2> [| …]` — Create a poll

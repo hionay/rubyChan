@@ -22,6 +22,7 @@ import (
 	"github.com/hionay/rubyChan/command/calc"
 	"github.com/hionay/rubyChan/command/fact"
 	"github.com/hionay/rubyChan/command/joke"
+	"github.com/hionay/rubyChan/command/poll"
 	"github.com/hionay/rubyChan/command/quote"
 	"github.com/hionay/rubyChan/command/reminder"
 	"github.com/hionay/rubyChan/command/repo"
@@ -68,6 +69,7 @@ func run(ctx context.Context) error {
 		&weather.WeatherCmd{WeatherAPIKey: cfg.WeatherAPIKey},
 		&repo.RepoCmd{},
 		&fact.FactCmd{},
+		&poll.PollCmd{},
 	)
 
 	syncer := cli.Syncer.(*mautrix.DefaultSyncer)

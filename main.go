@@ -21,6 +21,7 @@ import (
 	"github.com/hionay/rubyChan/command"
 	"github.com/hionay/rubyChan/command/calc"
 	"github.com/hionay/rubyChan/command/fact"
+	"github.com/hionay/rubyChan/command/gif"
 	"github.com/hionay/rubyChan/command/joke"
 	"github.com/hionay/rubyChan/command/poll"
 	"github.com/hionay/rubyChan/command/quote"
@@ -70,6 +71,7 @@ func run(ctx context.Context) error {
 		&repo.RepoCmd{},
 		&fact.FactCmd{},
 		&poll.PollCmd{},
+		&gif.GifCmd{APIKey: cfg.TenorAPIKey},
 	)
 
 	syncer := cli.Syncer.(*mautrix.DefaultSyncer)

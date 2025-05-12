@@ -15,6 +15,7 @@ const (
 	envGoogleCX       = "GOOGLE_CX"
 	envWeatherAPIKey  = "WEATHER_API_KEY"
 	envWebhookAddr    = "WEBHOOK_ADDR"
+	envTenorAPIKey    = "TENOR_API_KEY"
 )
 
 const (
@@ -30,6 +31,7 @@ type Config struct {
 	GoogleCX       string
 	WeatherAPIKey  string
 	WebhookAddr    string
+	TenorAPIKey    string
 }
 
 func NewConfig() (*Config, error) {
@@ -49,6 +51,7 @@ func NewConfig() (*Config, error) {
 	if webhookAddr == "" {
 		webhookAddr = ":" + defaultWebhookPort
 	}
+	tenorAPIKey := os.Getenv(envTenorAPIKey)
 
 	googleAPIKey := os.Getenv(envGoogleAPIKey)
 	googleCX := os.Getenv(envGoogleCX)
@@ -62,5 +65,6 @@ func NewConfig() (*Config, error) {
 		GoogleCX:       googleCX,
 		WeatherAPIKey:  openWeatherAPIKey,
 		WebhookAddr:    webhookAddr,
+		TenorAPIKey:    tenorAPIKey,
 	}, nil
 }

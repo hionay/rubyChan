@@ -1,31 +1,31 @@
-package poll
+package core
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
 
-	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
+	"github.com/hionay/rubyChan/core"
 )
 
+var _ core.Command = (*PollCmd)(nil)
+
+// PollCmd creates a native MSC3381 poll in Matrix (with fallback text).
+// Note: Requires your Matrix adapter to honor EventType and Content fields.
 type PollCmd struct{}
 
 func (*PollCmd) Name() string      { return "poll" }
-func (*PollCmd) Aliases() []string { return []string{} }
+func (*PollCmd) Aliases() []string { return nil }
 func (*PollCmd) Usage() string {
-	return "!poll <question> | <option1> | <option2> [| …] — Create a poll"
+	return "poll <question> | <option1> | <option2> [| …] — Create a poll"
 }
 
-func (c *PollCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+func (c *PollCmd) Run(ctx core.Context, args []string) (*core.Response, error) {
 	raw := strings.Join(args, " ")
 	parts := strings.Split(raw, "|")
 	if len(parts) < 3 {
-		cli.SendText(ctx, evt.RoomID, "Usage: "+c.Usage())
-		return
+		return &core.Response{Text: "Usage: " + c.Usage()}, nil
 	}
 
 	question := strings.TrimSpace(parts[0])
@@ -34,25 +34,25 @@ func (c *PollCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.E
 		opts[i] = strings.TrimSpace(opts[i])
 	}
 
-	answers := make([]map[string]any, len(opts))
+	answers := make([]map[string]interface{}, len(opts))
 	for i, opt := range opts {
 		uid := strconv.FormatInt(time.Now().UnixNano()+int64(i), 36)
-		answers[i] = map[string]any{
+		answers[i] = map[string]interface{}{
 			"id":                      uid,
 			"org.matrix.msc1767.text": opt,
 		}
 	}
 
-	var b strings.Builder
-	b.WriteString(question)
+	var sb strings.Builder
+	sb.WriteString(question)
 	for i, opt := range opts {
-		b.WriteString(fmt.Sprintf("\n%d. %s", i+1, opt))
+		sb.WriteString(fmt.Sprintf("\n%d. %s", i+1, opt))
 	}
-	fallback := b.String()
+	fallback := sb.String()
 
-	content := map[string]any{
-		"org.matrix.msc3381.poll.start": map[string]any{
-			"question": map[string]any{
+	content := map[string]interface{}{
+		"org.matrix.msc3381.poll.start": map[string]interface{}{
+			"question": map[string]interface{}{
 				"org.matrix.msc1767.text": question,
 				"body":                    question,
 				"msgtype":                 "m.text",
@@ -64,13 +64,9 @@ func (c *PollCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.E
 		"org.matrix.msc1767.text": fallback,
 	}
 
-	_, err := cli.SendMessageEvent(
-		ctx,
-		evt.RoomID,
-		event.EventUnstablePollStart,
-		content,
-	)
-	if err != nil {
-		log.Printf("Poll send error: %v", err)
-	}
+	return &core.Response{
+		Text:          fallback,
+		EventTypeName: "org.matrix.msc3381.poll.start",
+		Content:       content,
+	}, nil
 }

@@ -1,14 +1,14 @@
 package joke
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
+	"github.com/hionay/rubyChan/core"
 )
+
+var _ core.Command = (*JokeCmd)(nil)
 
 type JokeCmd struct{}
 
@@ -16,13 +16,12 @@ func (*JokeCmd) Name() string      { return "joke" }
 func (*JokeCmd) Aliases() []string { return []string{} }
 func (*JokeCmd) Usage() string     { return "!joke - Tell a random joke" }
 
-func (*JokeCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+func (*JokeCmd) Run(ctx core.Context, args []string) (*core.Response, error) {
 	joke, err := fetchJoke()
 	if err != nil {
-		cli.SendText(ctx, evt.RoomID, fmt.Sprintf("error: %v", err))
-		return
+		return nil, fmt.Errorf("failed to fetch joke: %w", err)
 	}
-	cli.SendText(ctx, evt.RoomID, joke)
+	return &core.Response{Text: joke}, nil
 }
 
 func fetchJoke() (string, error) {

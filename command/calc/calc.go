@@ -1,36 +1,36 @@
-package calc
+// core/calc.go
+
+package core
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	"github.com/Knetic/govaluate"
-	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
+
+	"github.com/hionay/rubyChan/core"
 )
+
+var _ core.Command = (*CalcCmd)(nil)
 
 type CalcCmd struct{}
 
 func (*CalcCmd) Name() string      { return "calc" }
-func (*CalcCmd) Aliases() []string { return []string{} }
-func (*CalcCmd) Usage() string     { return "!calc <expr> - Evaluate a math expression" }
+func (*CalcCmd) Aliases() []string { return nil }
+func (*CalcCmd) Usage() string     { return "calc <expr> — Evaluate a math expression" }
 
-func (c *CalcCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+func (c *CalcCmd) Run(ctx core.Context, args []string) (*core.Response, error) {
 	if len(args) < 1 {
-		cli.SendText(ctx, evt.RoomID, "Usage: "+c.Usage())
-		return
+		return &core.Response{Text: "Usage: " + c.Usage()}, nil
 	}
 	expr := strings.Join(args, " ")
 	e, err := govaluate.NewEvaluableExpression(expr)
 	if err != nil {
-		cli.SendText(ctx, evt.RoomID, "Invalid expression")
-		return
+		return nil, fmt.Errorf("invalid expression: %w", err)
 	}
 	res, err := e.Evaluate(nil)
 	if err != nil {
-		cli.SendText(ctx, evt.RoomID, fmt.Sprintf("Error: %v", err))
-		return
+		return nil, err
 	}
-	cli.SendText(ctx, evt.RoomID, fmt.Sprintf("%v", res))
+	return &core.Response{Text: fmt.Sprintf("%v", res)}, nil
 }

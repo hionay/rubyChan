@@ -1,16 +1,16 @@
-package gif
+package core
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
+	"github.com/hionay/rubyChan/core"
 )
+
+var _ core.Command = (*GifCmd)(nil)
 
 type GifCmd struct {
 	APIKey string
@@ -18,37 +18,30 @@ type GifCmd struct {
 
 func (*GifCmd) Name() string      { return "gif" }
 func (*GifCmd) Aliases() []string { return nil }
-func (*GifCmd) Usage() string     { return "!gif <search terms> — Fetch a GIF from Tenor" }
+func (*GifCmd) Usage() string     { return "gif <search terms> — Fetch a GIF from Tenor" }
 
-func (c *GifCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+func (c *GifCmd) Run(ctx core.Context, args []string) (*core.Response, error) {
 	if len(args) < 1 {
-		cli.SendText(ctx, evt.RoomID, "Usage: "+c.Usage())
-		return
+		return &core.Response{Text: "Usage: " + c.Usage()}, nil
 	}
 	if c.APIKey == "" {
-		cli.SendText(ctx, evt.RoomID, "TENOR_API_KEY not configured")
-		return
+		return nil, fmt.Errorf("API key not set")
 	}
 
 	query := strings.Join(args, " ")
 	gifURL, err := fetchGif(c.APIKey, query)
 	if err != nil {
-		cli.SendText(ctx, evt.RoomID, fmt.Sprintf("Error fetching GIF: %v", err))
-		return
+		return nil, fmt.Errorf("failed to fetch GIF: %w", err)
 	}
 	if gifURL == "" {
-		cli.SendText(ctx, evt.RoomID, "No GIFs found.")
-		return
+		return nil, fmt.Errorf("no GIF found for query: %s", query)
 	}
 
-	mention := fmt.Sprintf(`<a href="https://matrix.to/#/%s">%s</a>`, evt.Sender, evt.Sender)
-	content := event.MessageEventContent{
-		MsgType:       event.MsgText,
-		Body:          fmt.Sprintf("%s: %s", evt.Sender, gifURL),
-		Format:        event.FormatHTML,
-		FormattedBody: fmt.Sprintf("%s: <a href=%q>%s</a>", mention, gifURL, gifURL),
-	}
-	cli.SendMessageEvent(ctx, evt.RoomID, event.EventMessage, content)
+	userMention := ctx.Mention(ctx.UserID)
+	text := fmt.Sprintf("%s: %s", userMention, gifURL)
+	html := fmt.Sprintf("%s: <a href=\"%s\">%s</a>", userMention, gifURL, gifURL)
+
+	return &core.Response{Text: text, HTML: html}, nil
 }
 
 func fetchGif(apiKey, query string) (string, error) {
@@ -62,11 +55,12 @@ func fetchGif(apiKey, query string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("Tenor API returned status %d", resp.StatusCode)
 	}
 
-	var tr struct {
+	var result struct {
 		Results []struct {
 			MediaFormats struct {
 				GIF struct {
@@ -75,11 +69,11 @@ func fetchGif(apiKey, query string) (string, error) {
 			} `json:"media_formats"`
 		} `json:"results"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&tr); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
-	if len(tr.Results) == 0 {
+	if len(result.Results) == 0 {
 		return "", nil
 	}
-	return tr.Results[0].MediaFormats.GIF.URL, nil
+	return result.Results[0].MediaFormats.GIF.URL, nil
 }

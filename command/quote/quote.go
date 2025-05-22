@@ -1,7 +1,6 @@
-package quote
+package core
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,119 +8,108 @@ import (
 	"strconv"
 	"strings"
 
-	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
-	"maunium.net/go/mautrix/id"
-
-	"github.com/hionay/rubyChan/history"
+	"github.com/hionay/rubyChan/core"
 )
 
-const quoteWebsite = "https://quotes.halil.io"
+type HistoryMessage struct {
+	Sender string
+	Body   string
+}
 
 type HistoryFetcher interface {
-	GetLast(roomID id.RoomID, n int) []history.HistoryMessage
+	GetLast(channelID string, n int) []HistoryMessage
 }
 
 type QuoteCmd struct {
-	History HistoryFetcher
+	Fetcher HistoryFetcher
+	APIURL  string // "https://quotes.halil.io"
 }
 
 func (*QuoteCmd) Name() string      { return "quote" }
 func (*QuoteCmd) Aliases() []string { return []string{"q"} }
 func (*QuoteCmd) Usage() string {
-	return "!quote <n> [comment] - Quote the last n messages with optional comment"
+	return "quote <n> [comment] — Quote the last n messages with optional comment"
 }
 
-func (q *QuoteCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+// Run executes the quote command.
+func (c *QuoteCmd) Run(ctx core.Context, args []string) (*core.Response, error) {
 	if len(args) < 1 {
-		cli.SendText(ctx, evt.RoomID, "Usage: "+q.Usage())
-		return
+		return &core.Response{Text: "Usage: " + c.Usage()}, nil
 	}
 	n, err := strconv.Atoi(args[0])
 	if err != nil || n < 1 {
-		cli.SendText(ctx, evt.RoomID, "Invalid number of lines")
-		return
+		return nil, fmt.Errorf("invalid number of messages to quote: %s", args[0])
 	}
 	comment := ""
 	if len(args) > 1 {
 		comment = strings.Join(args[1:], " ")
 	}
 
-	hist := q.History.GetLast(evt.RoomID, n+1)
-	if len(hist) <= 1 {
-		cli.SendText(ctx, evt.RoomID, "No messages to quote.")
-		return
+	history := c.Fetcher.GetLast(ctx.ChannelID, n+1)
+	if len(history) <= 1 {
+		return nil, fmt.Errorf("not enough messages to quote")
 	}
-	hist = hist[:len(hist)-1]
-
-	if n > len(hist) {
-		n = len(hist)
+	history = history[:len(history)-1]
+	if n > len(history) {
+		n = len(history)
 	}
-	slice := hist[len(hist)-n:]
+	slice := history[len(history)-n:]
 
 	lines := make([]string, len(slice))
-	for i, m := range slice {
-		body := m.Body
+	for i, msg := range slice {
+		body := msg.Body
 		parts := strings.Fields(body)
 		for j, p := range parts {
 			if strings.HasPrefix(p, "@") {
-				parts[j] = parseNick(p)
+				parts[j] = p[1:]
 				if j == 0 {
 					parts[j] += ":"
 				}
 			}
 		}
-		lines[i] = fmt.Sprintf("<%s> %s", m.Sender, strings.Join(parts, " "))
+		lines[i] = fmt.Sprintf("<%s> %s", msg.Sender, strings.Join(parts, " "))
 	}
 	quoteText := strings.Join(lines, "\n")
-	fullLink, err := postQuote(quoteText, comment)
+
+	fullLink, err := postQuote(c.APIURL, quoteText, comment)
 	if err != nil {
-		cli.SendText(ctx, evt.RoomID, "Failed to post quote: "+err.Error())
-		return
+		return nil, fmt.Errorf("failed to post quote: %w", err)
 	}
-	reply := fmt.Sprintf("Quoted %d messages: %s", n, fullLink)
-	cli.SendText(ctx, evt.RoomID, reply)
+
+	userMention := ctx.Mention(ctx.UserID)
+	text := fmt.Sprintf("%s: Quoted %d messages: %s", userMention, n, fullLink)
+	html := fmt.Sprintf("%s: <a href=\"%s\">%s</a>", userMention, fullLink, fullLink)
+	return &core.Response{Text: text, HTML: html}, nil
 }
 
-func postQuote(quoteText, comment string) (string, error) {
-	resp, err := http.PostForm(quoteWebsite+"/add", url.Values{
+func postQuote(apiURL, quoteText, comment string) (string, error) {
+	resp, err := http.PostForm(apiURL+"/add", url.Values{
 		"quote":   {quoteText},
 		"comment": {comment},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to post quote: %w", err)
+		return "", err
 	}
 	defer resp.Body.Close()
-
-	b, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return "", err
 	}
-	html := string(b)
+	html := string(body)
 	marker := `class="text-[#b4a6c6] text-sm hover:underline"`
 	idx := strings.Index(html, marker)
 	if idx < 0 {
-		return "", fmt.Errorf("failed to find quote link in response")
+		return "", fmt.Errorf("quote link not found in response")
 	}
 	hrefIdx := strings.LastIndex(html[:idx], `<a href="`)
 	if hrefIdx < 0 {
-		return "", fmt.Errorf("failed to find quote link in response")
+		return "", fmt.Errorf("quote link not found in response")
 	}
 	start := hrefIdx + len(`<a href="`)
 	end := strings.Index(html[start:], `"`)
 	if end < 0 {
-		return "", fmt.Errorf("failed to find quote link in response")
+		return "", fmt.Errorf("quote link not found in response")
 	}
-	linkPath := html[start : start+end]
-	fullLink := quoteWebsite + linkPath
-	return fullLink, nil
-}
-
-func parseNick(name string) string {
-	if i := strings.Index(name, ":"); i > 0 {
-		nick := strings.Clone(name)
-		nick = nick[1:i]
-		return nick
-	}
-	return name
+	path := html[start : start+end]
+	return apiURL + path, nil
 }

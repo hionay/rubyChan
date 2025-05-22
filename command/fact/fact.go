@@ -1,14 +1,14 @@
 package fact
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
+	"github.com/hionay/rubyChan/core"
 )
+
+var _ core.Command = (*FactCmd)(nil)
 
 type FactCmd struct{}
 
@@ -16,13 +16,12 @@ func (*FactCmd) Name() string      { return "fact" }
 func (*FactCmd) Aliases() []string { return []string{} }
 func (*FactCmd) Usage() string     { return "!fact - Get today's useless fact" }
 
-func (*FactCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, _ []string) {
+func (*FactCmd) Run(ctx core.Context, args []string) (*core.Response, error) {
 	fact, err := fetchFact()
 	if err != nil {
-		cli.SendText(ctx, evt.RoomID, "Error fetching fact: "+err.Error())
-		return
+		return nil, fmt.Errorf("failed to fetch fact: %w", err)
 	}
-	cli.SendText(ctx, evt.RoomID, fact)
+	return &core.Response{Text: fact}, nil
 }
 
 func fetchFact() (string, error) {

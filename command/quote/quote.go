@@ -64,8 +64,9 @@ func (q *QuoteCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.
 		body := m.Body
 		parts := strings.Fields(body)
 		for j, p := range parts {
-			if strings.HasPrefix(p, "@") {
-				parts[j] = parseNick(p)
+			sigil, localPart, _ := id.ParseCommonIdentifier(p)
+			if sigil == '@' && localPart != "" {
+				parts[j] = localPart
 				if j == 0 {
 					parts[j] += ":"
 				}
@@ -115,13 +116,4 @@ func postQuote(quoteText, comment string) (string, error) {
 	linkPath := html[start : start+end]
 	fullLink := quoteWebsite + linkPath
 	return fullLink, nil
-}
-
-func parseNick(name string) string {
-	if i := strings.Index(name, ":"); i > 0 {
-		nick := strings.Clone(name)
-		nick = nick[1:i]
-		return nick
-	}
-	return name
 }

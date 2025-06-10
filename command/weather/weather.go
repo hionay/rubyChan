@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 )
 
 type WeatherCmd struct {
@@ -19,24 +21,41 @@ type WeatherCmd struct {
 func (*WeatherCmd) Name() string      { return "weather" }
 func (*WeatherCmd) Aliases() []string { return []string{"w"} }
 func (*WeatherCmd) Usage() string {
-	return "!weather <location> - Show current weather for <location>"
+	return "!weather [location] — Show current weather for [location], or last used"
 }
 
+var (
+	lastLocations   = make(map[id.RoomID]string)
+	lastLocationsMu sync.RWMutex
+)
+
 func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+	var loc string
+
 	if len(args) == 0 {
-		cli.SendText(ctx, evt.RoomID, "Usage: "+wc.Usage())
-		return
+		lastLocationsMu.RLock()
+		loc = lastLocations[evt.RoomID]
+		lastLocationsMu.RUnlock()
+		if loc == "" {
+			cli.SendText(ctx, evt.RoomID, "Usage: "+wc.Usage())
+			return
+		}
+	} else {
+		loc = strings.Join(args, " ")
+		lastLocationsMu.Lock()
+		lastLocations[evt.RoomID] = loc
+		lastLocationsMu.Unlock()
 	}
-	loc := strings.Join(args, " ")
+
 	reply, err := getWeatherOfLocation(wc.WeatherAPIKey, loc)
 	if err != nil {
-		cli.SendText(ctx, evt.RoomID, fmt.Sprintf("️error: %v", err))
+		cli.SendText(ctx, evt.RoomID, fmt.Sprintf("error: %v", err))
 		return
 	}
 	cli.SendText(ctx, evt.RoomID, reply)
 }
 
-func getWeatherOfLocation(apiKey string, location string) (string, error) {
+func getWeatherOfLocation(apiKey, location string) (string, error) {
 	endpoint := fmt.Sprintf(
 		"https://api.weatherapi.com/v1/current.json?key=%s&q=%s&aqi=no",
 		apiKey,

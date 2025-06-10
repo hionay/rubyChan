@@ -19,7 +19,7 @@ func parseMessage(cli *mautrix.Client, store *history.HistoryStore) func(context
 	st := time.Now()
 	return func(ctx context.Context, evt *event.Event) {
 		raw := strings.TrimSpace(evt.Content.AsMessage().Body)
-		nick := parseNick(string(evt.Sender))
+		nick := evt.Sender.Localpart()
 		store.Add(evt.RoomID, history.HistoryMessage{
 			Sender:    nick,
 			Body:      raw,
@@ -49,13 +49,4 @@ func parseMessage(cli *mautrix.Client, store *history.HistoryStore) func(context
 			}
 		}
 	}
-}
-
-func parseNick(name string) string {
-	if i := strings.Index(name, ":"); i > 0 {
-		nick := strings.Clone(name)
-		nick = nick[1:i]
-		return nick
-	}
-	return name
 }

@@ -21,38 +21,49 @@ type WeatherCmd struct {
 func (*WeatherCmd) Name() string      { return "weather" }
 func (*WeatherCmd) Aliases() []string { return []string{"w"} }
 func (*WeatherCmd) Usage() string {
-	return "!weather [location] — Show current weather for [location], or last used"
+	return "!weather [location] — Show current weather for [location], or last used by you"
 }
 
 var (
-	lastLocations   = make(map[id.RoomID]string)
+	lastLocations   = make(map[id.RoomID]map[id.UserID]string)
 	lastLocationsMu sync.RWMutex
 )
 
 func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
+	user := evt.Sender
+	room := evt.RoomID
+
 	var loc string
 
 	if len(args) == 0 {
 		lastLocationsMu.RLock()
-		loc = lastLocations[evt.RoomID]
+		if roomMap, ok := lastLocations[room]; ok {
+			loc = roomMap[user]
+		}
 		lastLocationsMu.RUnlock()
+
 		if loc == "" {
-			cli.SendText(ctx, evt.RoomID, "Usage: "+wc.Usage())
+			cli.SendText(ctx, room, "Usage: "+wc.Usage())
 			return
 		}
 	} else {
 		loc = strings.Join(args, " ")
 		lastLocationsMu.Lock()
-		lastLocations[evt.RoomID] = loc
+		roomMap, ok := lastLocations[room]
+		if !ok {
+			roomMap = make(map[id.UserID]string)
+			lastLocations[room] = roomMap
+		}
+		roomMap[user] = loc
 		lastLocationsMu.Unlock()
 	}
 
 	reply, err := getWeatherOfLocation(wc.WeatherAPIKey, loc)
 	if err != nil {
-		cli.SendText(ctx, evt.RoomID, fmt.Sprintf("error: %v", err))
+		cli.SendText(ctx, room, fmt.Sprintf("error: %v", err))
 		return
 	}
-	cli.SendText(ctx, evt.RoomID, reply)
+	cli.SendText(ctx, room, reply)
 }
 
 func getWeatherOfLocation(apiKey, location string) (string, error) {

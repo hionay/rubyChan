@@ -3,53 +3,56 @@ package roulette
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
-	"sync"
 	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
-	"maunium.net/go/mautrix/id"
+
+	"github.com/hionay/rubyChan/state"
 )
 
-type roomState struct {
-	click   int
-	chamber int
-}
-
 type RouletteCmd struct {
-	mu         sync.Mutex
-	roomStates map[id.RoomID]*roomState
+	Store *state.Namespace
 }
 
-func (c *RouletteCmd) Name() string      { return "roulette" }
-func (c *RouletteCmd) Aliases() []string { return nil }
-func (c *RouletteCmd) Usage() string     { return "!roulette - Play Russian Roulette" }
+func (*RouletteCmd) Name() string      { return "roulette" }
+func (*RouletteCmd) Aliases() []string { return nil }
+func (*RouletteCmd) Usage() string     { return "!roulette - Play Russian Roulette" }
+
+type roomState struct {
+	Click   int `json:"click"`
+	Chamber int `json:"chamber"`
+}
 
 func (c *RouletteCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, _ []string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.roomStates == nil {
-		c.roomStates = make(map[id.RoomID]*roomState)
+	st := &roomState{}
+	if err := c.Store.GetJSON(evt.RoomID.String(), st); err != nil {
+		log.Printf("roulette: error loading state: %v", err)
+		cli.SendText(ctx, evt.RoomID, "Internal error")
+		return
 	}
-	st, ok := c.roomStates[evt.RoomID]
-	if !ok {
+	if st.Chamber == 0 {
 		rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
-		st = &roomState{
-			click:   0,
-			chamber: rnd.Intn(6) + 1,
-		}
-		c.roomStates[evt.RoomID] = st
+		st.Chamber = rnd.Intn(6) + 1
 	}
-	st.click++
+
+	st.Click++
 	var reply string
-	if st.click == st.chamber {
-		reply = fmt.Sprintf("(%d/6) 💥 Bang! You’re dead.", st.click)
-		delete(c.roomStates, evt.RoomID)
+
+	if st.Click == st.Chamber {
+		reply = fmt.Sprintf("(%d/6) 💥 Bang! You’re dead.", st.Click)
+		if err := c.Store.Delete(evt.RoomID.String()); err != nil {
+			log.Printf("roulette: error deleting state: %v", err)
+		}
 	} else {
-		reply = fmt.Sprintf("(%d/6) click... you survived.", st.click)
+		reply = fmt.Sprintf("(%d/6) click... you survived.", st.Click)
+		if err := c.Store.PutJSON(evt.RoomID.String(), st); err != nil {
+			log.Printf("roulette: error saving state: %v", err)
+		}
 	}
+
 	mention := fmt.Sprintf(`<a href="https://matrix.to/#/%s">%s</a>`, evt.Sender, evt.Sender)
 	content := event.MessageEventContent{
 		MsgType:       event.MsgText,
@@ -57,5 +60,7 @@ func (c *RouletteCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *eve
 		Format:        event.FormatHTML,
 		FormattedBody: fmt.Sprintf("%s: %s", mention, reply),
 	}
-	cli.SendMessageEvent(ctx, evt.RoomID, event.EventMessage, content)
+	if _, err := cli.SendMessageEvent(ctx, evt.RoomID, event.EventMessage, content); err != nil {
+		log.Printf("roulette: failed to send reply: %v", err)
+	}
 }

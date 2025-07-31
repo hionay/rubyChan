@@ -7,15 +7,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
-	"maunium.net/go/mautrix/id"
+
+	"github.com/hionay/rubyChan/state"
 )
 
 type WeatherCmd struct {
 	WeatherAPIKey string
+	Store         *state.Namespace
 }
 
 func (*WeatherCmd) Name() string      { return "weather" }
@@ -24,38 +25,29 @@ func (*WeatherCmd) Usage() string {
 	return "!weather [location] — Show current weather for [location], or last used by you"
 }
 
-var (
-	lastLocations   = make(map[id.RoomID]map[id.UserID]string)
-	lastLocationsMu sync.RWMutex
-)
-
 func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
 	user := evt.Sender
 	room := evt.RoomID
 
 	var loc string
-
+	var err error
+	key := room.String() + "|" + user.String()
 	if len(args) == 0 {
-		lastLocationsMu.RLock()
-		if roomMap, ok := lastLocations[room]; ok {
-			loc = roomMap[user]
+		loc, err = wc.Store.GetString(key)
+		if err != nil {
+			cli.SendText(ctx, room, fmt.Sprintf("error retrieving last location: %v", err))
+			return
 		}
-		lastLocationsMu.RUnlock()
-
 		if loc == "" {
 			cli.SendText(ctx, room, "Usage: "+wc.Usage())
 			return
 		}
 	} else {
 		loc = strings.Join(args, " ")
-		lastLocationsMu.Lock()
-		roomMap, ok := lastLocations[room]
-		if !ok {
-			roomMap = make(map[id.UserID]string)
-			lastLocations[room] = roomMap
+		if err := wc.Store.PutString(key, loc); err != nil {
+			cli.SendText(ctx, room, fmt.Sprintf("error saving location: %v", err))
+			return
 		}
-		roomMap[user] = loc
-		lastLocationsMu.Unlock()
 	}
 
 	reply, err := getWeatherOfLocation(wc.WeatherAPIKey, loc)

@@ -31,6 +31,7 @@ import (
 	"github.com/hionay/rubyChan/command/search"
 	"github.com/hionay/rubyChan/command/weather"
 	"github.com/hionay/rubyChan/history"
+	"github.com/hionay/rubyChan/state"
 )
 
 func init() {
@@ -48,6 +49,25 @@ func main() {
 }
 
 func run(ctx context.Context) error {
+	storePath := "bot_state.db"
+	if v := os.Getenv("BOT_STATE_DB_PATH"); v != "" {
+		storePath = v
+	}
+	store, err := state.NewStore(storePath)
+	if err != nil {
+		return fmt.Errorf("state.NewStore(): %w", err)
+	}
+	defer store.Close()
+
+	rouletteNS, err := store.Namespace("roulette")
+	if err != nil {
+		return fmt.Errorf("store.Namespace(roulette): %w", err)
+	}
+	weatherNS, err := store.Namespace("weather")
+	if err != nil {
+		return fmt.Errorf("store.Namespace(weather): %w", err)
+	}
+
 	cfg, err := NewConfig()
 	if err != nil {
 		return fmt.Errorf("NewConfig(): %w", err)
@@ -65,9 +85,9 @@ func run(ctx context.Context) error {
 		&joke.JokeCmd{},
 		&quote.QuoteCmd{History: historyStore},
 		&reminder.RemindMeCmd{},
-		&roulette.RouletteCmd{},
+		&roulette.RouletteCmd{Store: rouletteNS},
 		&search.SearchCmd{GoogleAPIKey: cfg.GoogleAPIKey, GoogleCX: cfg.GoogleCX},
-		&weather.WeatherCmd{WeatherAPIKey: cfg.WeatherAPIKey},
+		&weather.WeatherCmd{Store: weatherNS, WeatherAPIKey: cfg.WeatherAPIKey},
 		&repo.RepoCmd{},
 		&fact.FactCmd{},
 		&poll.PollCmd{},

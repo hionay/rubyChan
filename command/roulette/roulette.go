@@ -202,7 +202,7 @@ func formatTop(items []kv) string {
 	}
 	parts := make([]string, 0, len(items))
 	for _, it := range items {
-		parts = append(parts, fmt.Sprintf("%s (%d)", it.K, it.V))
+		parts = append(parts, fmt.Sprintf("%s (%d)", displayUser(it.K), it.V))
 	}
 	return strings.Join(parts, ", ")
 }
@@ -221,4 +221,11 @@ func sendMentionReply(ctx context.Context, cli *mautrix.Client, evt *event.Event
 	if _, err := cli.SendMessageEvent(ctx, evt.RoomID, event.EventMessage, content); err != nil {
 		log.Printf("roulette: failed to send reply: %v", err)
 	}
+}
+
+func displayUser(mxid string) string {
+	if i := strings.IndexByte(mxid, ':'); i > 0 {
+		return mxid[:i]
+	}
+	return mxid
 }

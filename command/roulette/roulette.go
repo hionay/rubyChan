@@ -13,6 +13,7 @@ import (
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 
 	"github.com/hionay/rubyChan/state"
 )
@@ -162,16 +163,38 @@ func (c *RouletteCmd) sendStats(ctx context.Context, cli *mautrix.Client, evt *e
 	topDeaths := topN(ss.DeathsByUser, 3)
 	topSurv := topN(ss.SurvivesByUser, 3)
 
-	msg := fmt.Sprintf(
+	plainMsg := fmt.Sprintf(
 		"Roulette stats (this room)\n%s\nAll-time: %d pulls • %d deaths • %.1f%% death rate\nLongest streak: %d survivals\nMost deaths: %s\nMost survivals: %s",
 		currentLine,
 		ss.TotalPulls, ss.TotalDeaths, deathRate,
 		ss.LongestStreak,
-		formatTop(topDeaths),
-		formatTop(topSurv),
+		formatTopPlain(ctx, cli, evt.RoomID, topDeaths),
+		formatTopPlain(ctx, cli, evt.RoomID, topSurv),
 	)
 
-	cli.SendText(ctx, evt.RoomID, msg)
+	htmlMsg := fmt.Sprintf(
+		`<b>Roulette stats</b> (this room)<br>%s<br>`+
+			`All-time: %d pulls • %d deaths • %.1f%% death rate<br>`+
+			`Longest streak: %d survivals<br>`+
+			`Most deaths: %s<br>`+
+			`Most survivals: %s`,
+		html.EscapeString(currentLine),
+		ss.TotalPulls, ss.TotalDeaths, deathRate,
+		ss.LongestStreak,
+		formatTopHTML(ctx, cli, evt.RoomID, topDeaths),
+		formatTopHTML(ctx, cli, evt.RoomID, topSurv),
+	)
+
+	content := event.MessageEventContent{
+		MsgType:       event.MsgText,
+		Body:          plainMsg,
+		Format:        event.FormatHTML,
+		FormattedBody: htmlMsg,
+	}
+
+	if _, err := cli.SendMessageEvent(ctx, evt.RoomID, event.EventMessage, content); err != nil {
+		log.Printf("roulette: failed to send stats: %v", err)
+	}
 }
 
 type kv struct {
@@ -196,36 +219,68 @@ func topN(m map[string]int, n int) []kv {
 	return out
 }
 
-func formatTop(items []kv) string {
+func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []kv) string {
 	if len(items) == 0 {
 		return "—"
 	}
 	parts := make([]string, 0, len(items))
 	for _, it := range items {
-		parts = append(parts, fmt.Sprintf("%s (%d)", displayUser(it.K), it.V))
+		parts = append(parts, fmt.Sprintf("%s (%d)", mentionNickHTML(ctx, cli, roomID, it.K), it.V))
 	}
 	return strings.Join(parts, ", ")
 }
 
-func sendMentionReply(ctx context.Context, cli *mautrix.Client, evt *event.Event, sender, reply string) {
-	escSender := html.EscapeString(sender)
+func formatTopPlain(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []kv) string {
+	if len(items) == 0 {
+		return "—"
+	}
+	parts := make([]string, 0, len(items))
+	for _, it := range items {
+		parts = append(parts, fmt.Sprintf("@%s (%d)", displayNick(ctx, cli, roomID, it.K), it.V))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func mentionNickHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, mxid string) string {
+	nick := displayNick(ctx, cli, roomID, mxid)
+	return fmt.Sprintf(
+		`<a href="https://matrix.to/#/%s">@%s</a>`,
+		html.EscapeString(mxid),
+		html.EscapeString(nick),
+	)
+}
+
+func displayNick(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, mxid string) string {
+	if cli.StateStore != nil {
+		if member, err := cli.StateStore.GetMember(ctx, roomID, id.UserID(mxid)); err == nil && member != nil {
+			if member.Displayname != "" {
+				return member.Displayname
+			}
+		}
+	}
+
+	if i := strings.IndexByte(mxid, ':'); i > 1 && mxid[0] == '@' {
+		return mxid[1:i]
+	}
+	return mxid
+}
+
+func sendMentionReply(ctx context.Context, cli *mautrix.Client, evt *event.Event, senderMXID, reply string) {
+	nick := displayNick(ctx, cli, evt.RoomID, senderMXID)
+
+	escMXID := html.EscapeString(senderMXID)
+	escNick := html.EscapeString(nick)
 	escReply := html.EscapeString(reply)
 
-	mention := fmt.Sprintf(`<a href="https://matrix.to/#/%s">%s</a>`, escSender, escSender)
+	mention := fmt.Sprintf(`<a href="https://matrix.to/#/%s">@%s</a>`, escMXID, escNick)
+
 	content := event.MessageEventContent{
 		MsgType:       event.MsgText,
-		Body:          fmt.Sprintf("%s: %s", sender, reply),
+		Body:          fmt.Sprintf("%s: %s", senderMXID, reply),
 		Format:        event.FormatHTML,
 		FormattedBody: fmt.Sprintf("%s: %s", mention, escReply),
 	}
 	if _, err := cli.SendMessageEvent(ctx, evt.RoomID, event.EventMessage, content); err != nil {
 		log.Printf("roulette: failed to send reply: %v", err)
 	}
-}
-
-func displayUser(mxid string) string {
-	if i := strings.IndexByte(mxid, ':'); i > 0 {
-		return mxid[:i]
-	}
-	return mxid
 }

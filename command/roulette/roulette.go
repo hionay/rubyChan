@@ -53,11 +53,18 @@ func (c *RouletteCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *eve
 	lock.Lock()
 	defer lock.Unlock()
 
-	if len(args) > 0 && strings.EqualFold(args[0], "stats") {
-		c.sendStats(ctx, cli, evt)
+	if len(args) > 0 {
+		arg := strings.ToLower(args[0])
+		switch arg {
+		case "stats":
+			c.sendStats(ctx, cli, evt)
+		case "reset":
+			c.resetRound(ctx, cli, evt)
+		default:
+			cli.SendText(ctx, evt.RoomID, "Unknown subcommand. Usage: !roulette [stats|reset]")
+		}
 		return
 	}
-
 	c.play(ctx, cli, evt)
 }
 
@@ -195,6 +202,28 @@ func (c *RouletteCmd) sendStats(ctx context.Context, cli *mautrix.Client, evt *e
 	if _, err := cli.SendMessageEvent(ctx, evt.RoomID, event.EventMessage, content); err != nil {
 		log.Printf("roulette: failed to send stats: %v", err)
 	}
+}
+
+func (c *RouletteCmd) resetRound(ctx context.Context, cli *mautrix.Client, evt *event.Event) {
+	roomID := evt.RoomID.String()
+	roundKey := "round:" + roomID
+
+	rs := &roundState{}
+	if err := c.Store.GetJSON(roundKey, rs); err != nil {
+		log.Printf("roulette: error loading round state: %v", err)
+		cli.SendText(ctx, evt.RoomID, "Internal error")
+		return
+	}
+	if rs.Click != 5 {
+		cli.SendText(ctx, evt.RoomID, "Cannot reset: round can be reset only after 5 pulls (before the final one).")
+		return
+	}
+	if err := c.Store.Delete(roundKey); err != nil {
+		log.Printf("roulette: error deleting round state: %v", err)
+		cli.SendText(ctx, evt.RoomID, "Internal error")
+		return
+	}
+	cli.SendText(ctx, evt.RoomID, "Round has been reset.")
 }
 
 type kv struct {

@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"strings"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -35,11 +36,11 @@ func (h *HelpCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.E
 		return
 	}
 
-	var helpMsg string
+	var helpMsg strings.Builder
 	for _, cmd := range Registry {
-		helpMsg += cmd.Usage() + "\n"
+		helpMsg.WriteString(cmd.Usage() + "\n")
 	}
-	if _, err := cli.SendText(ctx, evt.RoomID, helpMsg); err != nil {
+	if _, err := cli.SendText(ctx, evt.RoomID, helpMsg.String()); err != nil {
 		cli.SendText(ctx, evt.RoomID, "Error sending help message")
 	}
 }

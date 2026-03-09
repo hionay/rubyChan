@@ -100,11 +100,11 @@ func postQuote(quoteText, comment string) (string, error) {
 	}
 	html := string(b)
 	marker := `class="text-[#b4a6c6] text-sm hover:underline"`
-	idx := strings.Index(html, marker)
-	if idx < 0 {
+	before, _, ok := strings.Cut(html, marker)
+	if !ok {
 		return "", fmt.Errorf("failed to find quote link in response")
 	}
-	hrefIdx := strings.LastIndex(html[:idx], `<a href="`)
+	hrefIdx := strings.LastIndex(before, `<a href="`)
 	if hrefIdx < 0 {
 		return "", fmt.Errorf("failed to find quote link in response")
 	}

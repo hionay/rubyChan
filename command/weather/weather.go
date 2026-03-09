@@ -82,8 +82,9 @@ func getWeatherOfLocation(apiKey, location string) (string, error) {
 			Country string `json:"country"`
 		} `json:"location"`
 		Current struct {
-			TempC     float64 `json:"temp_c"`
-			Condition struct {
+			LastUpdated string  `json:"last_updated"`
+			TempC       float64 `json:"temp_c"`
+			Condition   struct {
 				Text string `json:"text"`
 			} `json:"condition"`
 			Humidity   int     `json:"humidity"`
@@ -100,7 +101,7 @@ func getWeatherOfLocation(apiKey, location string) (string, error) {
 	}
 
 	return fmt.Sprintf(
-		"Weather in %s, %s, %s: %.1f°C, feels like %.1f°C, %s, humidity %d%%, wind %.1f kph",
+		"Weather in %s, %s, %s: %.1f°C, feels like %.1f°C, %s, humidity %d%%, wind %.1f kph (Last updated: %s)",
 		wr.Location.Name,
 		wr.Location.Region,
 		wr.Location.Country,
@@ -109,5 +110,6 @@ func getWeatherOfLocation(apiKey, location string) (string, error) {
 		wr.Current.Condition.Text,
 		wr.Current.Humidity,
 		wr.Current.WindKph,
+		wr.Current.LastUpdated,
 	), nil
 }

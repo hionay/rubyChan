@@ -30,6 +30,7 @@ import (
 	"github.com/hionay/rubyChan/command/repo"
 	"github.com/hionay/rubyChan/command/roulette"
 	"github.com/hionay/rubyChan/command/search"
+	"github.com/hionay/rubyChan/command/typerace"
 	"github.com/hionay/rubyChan/command/weather"
 	"github.com/hionay/rubyChan/history"
 	"github.com/hionay/rubyChan/state"
@@ -68,6 +69,10 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("store.Namespace(weather): %w", err)
 	}
+	typeraceNS, err := store.Namespace("typerace")
+	if err != nil {
+		return fmt.Errorf("store.Namespace(typerace): %w", err)
+	}
 
 	cfg, err := NewConfig()
 	if err != nil {
@@ -80,6 +85,7 @@ func run(ctx context.Context) error {
 	}
 
 	historyStore := history.NewHistoryStore(100)
+	tr := typerace.NewTypeRaceCmd(typeraceNS)
 	command.Register(
 		&calc.CalcCmd{},
 		&command.HelpCmd{},

@@ -13,7 +13,7 @@ import (
 type PingCmd struct{}
 
 func (*PingCmd) Name() string      { return "ping" }
-func (*PingCmd) Aliases() []string { return []string{} }
+func (*PingCmd) Aliases() []string { return []string{"p"} }
 func (*PingCmd) Usage() string     { return "!ping - Check bot latency" }
 
 func (c *PingCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {

@@ -34,6 +34,9 @@ func parseMessage(cli *mautrix.Client, store *history.HistoryStore) func(context
 
 		body, ok := strings.CutPrefix(raw, cmdPrefix)
 		if !ok {
+			for _, h := range command.MessageHandlers() {
+				h.HandleMessage(ctx, cli, evt)
+			}
 			return
 		}
 		fields := strings.Fields(body)

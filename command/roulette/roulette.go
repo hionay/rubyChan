@@ -6,7 +6,6 @@ import (
 	"html"
 	"log"
 	"math/rand"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 
+	"github.com/hionay/rubyChan/internal/matrixutil"
 	"github.com/hionay/rubyChan/state"
 )
 
@@ -167,8 +167,8 @@ func (c *RouletteCmd) sendStats(ctx context.Context, cli *mautrix.Client, evt *e
 		deathRate = (float64(ss.TotalDeaths) / float64(ss.TotalPulls)) * 100
 	}
 
-	topDeaths := topN(ss.DeathsByUser, 3)
-	topSurv := topN(ss.SurvivesByUser, 3)
+	topDeaths := matrixutil.TopN(ss.DeathsByUser, 3)
+	topSurv := matrixutil.TopN(ss.SurvivesByUser, 3)
 
 	plainMsg := fmt.Sprintf(
 		"Roulette stats (this room)\n%s\nAll-time: %d pulls • %d deaths • %.1f%% death rate\nLongest streak: %d survivals\nMost deaths: %s\nMost survivals: %s",
@@ -226,76 +226,30 @@ func (c *RouletteCmd) resetRound(ctx context.Context, cli *mautrix.Client, evt *
 	cli.SendText(ctx, evt.RoomID, "Round has been reset.")
 }
 
-type kv struct {
-	K string
-	V int
-}
-
-func topN(m map[string]int, n int) []kv {
-	out := make([]kv, 0, len(m))
-	for k, v := range m {
-		out = append(out, kv{K: k, V: v})
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].V == out[j].V {
-			return out[i].K < out[j].K
-		}
-		return out[i].V > out[j].V
-	})
-	if len(out) > n {
-		out = out[:n]
-	}
-	return out
-}
-
-func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []kv) string {
+func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV) string {
 	if len(items) == 0 {
 		return "—"
 	}
 	parts := make([]string, 0, len(items))
 	for _, it := range items {
-		parts = append(parts, fmt.Sprintf("%s (%d)", mentionNickHTML(ctx, cli, roomID, it.K), it.V))
+		parts = append(parts, fmt.Sprintf("%s (%d)", matrixutil.MentionNickHTML(ctx, cli, roomID, it.K), it.V))
 	}
 	return strings.Join(parts, ", ")
 }
 
-func formatTopPlain(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []kv) string {
+func formatTopPlain(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV) string {
 	if len(items) == 0 {
 		return "—"
 	}
 	parts := make([]string, 0, len(items))
 	for _, it := range items {
-		parts = append(parts, fmt.Sprintf("@%s (%d)", displayNick(ctx, cli, roomID, it.K), it.V))
+		parts = append(parts, fmt.Sprintf("@%s (%d)", matrixutil.DisplayNick(ctx, cli, roomID, it.K), it.V))
 	}
 	return strings.Join(parts, ", ")
-}
-
-func mentionNickHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, mxid string) string {
-	nick := displayNick(ctx, cli, roomID, mxid)
-	return fmt.Sprintf(
-		`<a href="https://matrix.to/#/%s">@%s</a>`,
-		html.EscapeString(mxid),
-		html.EscapeString(nick),
-	)
-}
-
-func displayNick(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, mxid string) string {
-	if cli.StateStore != nil {
-		if member, err := cli.StateStore.GetMember(ctx, roomID, id.UserID(mxid)); err == nil && member != nil {
-			if member.Displayname != "" {
-				return member.Displayname
-			}
-		}
-	}
-
-	if i := strings.IndexByte(mxid, ':'); i > 1 && mxid[0] == '@' {
-		return mxid[1:i]
-	}
-	return mxid
 }
 
 func sendMentionReply(ctx context.Context, cli *mautrix.Client, evt *event.Event, senderMXID, reply string) {
-	nick := displayNick(ctx, cli, evt.RoomID, senderMXID)
+	nick := matrixutil.DisplayNick(ctx, cli, evt.RoomID, senderMXID)
 
 	escMXID := html.EscapeString(senderMXID)
 	escNick := html.EscapeString(nick)

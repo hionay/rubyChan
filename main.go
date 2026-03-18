@@ -94,7 +94,9 @@ func run(ctx context.Context) error {
 		&poll.PollCmd{},
 		&gif.GifCmd{APIKey: cfg.TenorAPIKey},
 		&ping.PingCmd{},
+		tr,
 	)
+	command.RegisterMessageHandler(tr)
 
 	syncer := cli.Syncer.(*mautrix.DefaultSyncer)
 	syncer.OnEventType(event.EventMessage, parseMessage(cli, historyStore))

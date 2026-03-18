@@ -15,6 +15,23 @@ type Command interface {
 	Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string)
 }
 
+type MessageHandler interface {
+	HandleMessage(ctx context.Context, cli *mautrix.Client, evt *event.Event)
+}
+
+var messageHandlers []MessageHandler
+
+func RegisterMessageHandler(h ...MessageHandler) {
+	if len(h) == 0 {
+		return
+	}
+	messageHandlers = append(messageHandlers, h...)
+}
+
+func MessageHandlers() []MessageHandler {
+	return messageHandlers
+}
+
 var Registry []Command
 
 func Register(cmd ...Command) {

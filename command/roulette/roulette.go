@@ -24,7 +24,7 @@ type RouletteCmd struct {
 }
 
 func (*RouletteCmd) Name() string      { return "roulette" }
-func (*RouletteCmd) Aliases() []string { return nil }
+func (*RouletteCmd) Aliases() []string { return []string{"r"} }
 func (*RouletteCmd) Usage() string     { return "!roulette - Play Russian Roulette | !roulette stats" }
 
 type roundState struct {

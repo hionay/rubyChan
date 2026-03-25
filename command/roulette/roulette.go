@@ -226,7 +226,7 @@ func (c *RouletteCmd) resetRound(ctx context.Context, cli *mautrix.Client, evt *
 	cli.SendText(ctx, evt.RoomID, "Round has been reset.")
 }
 
-func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV) string {
+func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV[int]) string {
 	if len(items) == 0 {
 		return "—"
 	}
@@ -237,7 +237,7 @@ func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, i
 	return strings.Join(parts, ", ")
 }
 
-func formatTopPlain(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV) string {
+func formatTopPlain(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV[int]) string {
 	if len(items) == 0 {
 		return "—"
 	}

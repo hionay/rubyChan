@@ -1,6 +1,7 @@
 package matrixutil
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"html"
@@ -11,15 +12,15 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-type KV struct {
+type KV[V cmp.Ordered] struct {
 	K string
-	V int
+	V V
 }
 
-func TopN(m map[string]int, n int) []KV {
-	out := make([]KV, 0, len(m))
+func TopN[V cmp.Ordered](m map[string]V, n int) []KV[V] {
+	out := make([]KV[V], 0, len(m))
 	for k, v := range m {
-		out = append(out, KV{K: k, V: v})
+		out = append(out, KV[V]{K: k, V: v})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].V == out[j].V {

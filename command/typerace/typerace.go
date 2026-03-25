@@ -227,7 +227,7 @@ func (c *TypeRaceCmd) fetchPrompt(ctx context.Context) (string, error) {
 	return strings.ToLower(result.Quote), nil
 }
 
-func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV, wins map[string]int) string {
+func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV[int], wins map[string]int) string {
 	if len(items) == 0 {
 		return "—"
 	}
@@ -239,7 +239,7 @@ func formatTopHTML(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, i
 	return strings.Join(parts, "<br>")
 }
 
-func formatTopPlain(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV, wins map[string]int) string {
+func formatTopPlain(ctx context.Context, cli *mautrix.Client, roomID id.RoomID, items []matrixutil.KV[int], wins map[string]int) string {
 	if len(items) == 0 {
 		return "—"
 	}

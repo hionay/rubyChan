@@ -22,7 +22,7 @@ type WeatherCmd struct {
 func (*WeatherCmd) Name() string      { return "weather" }
 func (*WeatherCmd) Aliases() []string { return []string{"w"} }
 func (*WeatherCmd) Usage() string {
-	return "!weather [location] — Show current weather for [location], or last used by you\n!weather forecast [location] — Show 5-day forecast"
+	return "!weather [location] — Show current weather for [location], or last used by you\n!weather forecast [location] — Show 3-day forecast"
 }
 
 func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
@@ -126,7 +126,7 @@ func getWeatherOfLocation(apiKey, location string) (string, error) {
 
 func getForecast(apiKey, location string) (string, error) {
 	endpoint := fmt.Sprintf(
-		"https://api.weatherapi.com/v1/forecast.json?key=%s&q=%s&days=5&aqi=no&alerts=no",
+		"https://api.weatherapi.com/v1/forecast.json?key=%s&q=%s&days=3&aqi=no&alerts=no",
 		apiKey,
 		url.QueryEscape(location),
 	)
@@ -153,7 +153,12 @@ func getForecast(apiKey, location string) (string, error) {
 				Day  struct {
 					MaxTempC        float64 `json:"maxtemp_c"`
 					MinTempC        float64 `json:"mintemp_c"`
+					MaxWindKph      float64 `json:"maxwind_kph"`
+					TotalPrecipMM   float64 `json:"totalprecip_mm"`
+					TotalSnowCM     float64 `json:"totalsnow_cm"`
+					AvgHumidity     int     `json:"avghumidity"`
 					DailyChanceRain int     `json:"daily_chance_of_rain"`
+					DailyChanceSnow int     `json:"daily_chance_of_snow"`
 					Condition       struct {
 						Text string `json:"text"`
 					} `json:"condition"`
@@ -170,10 +175,20 @@ func getForecast(apiKey, location string) (string, error) {
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "5-day forecast for %s, %s, %s:\n", fr.Location.Name, fr.Location.Region, fr.Location.Country)
+	fmt.Fprintf(&sb, "3-day forecast for %s, %s, %s:\n", fr.Location.Name, fr.Location.Region, fr.Location.Country)
 	for _, d := range fr.Forecast.ForecastDay {
-		fmt.Fprintf(&sb, "  %s: %.1f°C / %.1f°C, %s, rain chance %d%%\n",
-			d.Date, d.Day.MaxTempC, d.Day.MinTempC, d.Day.Condition.Text, d.Day.DailyChanceRain)
+		line := fmt.Sprintf("  %s: %.0f°C / %.0f°C, %s | Rain %d%% (%.1fmm) | Wind max %.0fkph | Humidity %d%%",
+			d.Date,
+			d.Day.MaxTempC, d.Day.MinTempC,
+			d.Day.Condition.Text,
+			d.Day.DailyChanceRain, d.Day.TotalPrecipMM,
+			d.Day.MaxWindKph,
+			d.Day.AvgHumidity,
+		)
+		if d.Day.TotalSnowCM > 0 {
+			line += fmt.Sprintf(" | Snow %d%% (%.1fcm)", d.Day.DailyChanceSnow, d.Day.TotalSnowCM)
+		}
+		sb.WriteString(line + "\n")
 	}
 	return strings.TrimRight(sb.String(), "\n"), nil
 }

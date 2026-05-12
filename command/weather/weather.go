@@ -22,7 +22,7 @@ type WeatherCmd struct {
 func (*WeatherCmd) Name() string      { return "weather" }
 func (*WeatherCmd) Aliases() []string { return []string{"w"} }
 func (*WeatherCmd) Usage() string {
-	return "!weather [location] — Show current weather for [location], or last used by you\n!weather forecast [location] — Show 3-day forecast"
+	return "!weather [location] — Show current weather for [location], or last used by you\n!weather forecast [location] — Show 5-day forecast"
 }
 
 func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
@@ -126,7 +126,7 @@ func getWeatherOfLocation(apiKey, location string) (string, error) {
 
 func getForecast(apiKey, location string) (string, error) {
 	endpoint := fmt.Sprintf(
-		"https://api.weatherapi.com/v1/forecast.json?key=%s&q=%s&days=3&aqi=no&alerts=no",
+		"https://api.weatherapi.com/v1/forecast.json?key=%s&q=%s&days=5&aqi=no&alerts=no",
 		apiKey,
 		url.QueryEscape(location),
 	)
@@ -170,7 +170,7 @@ func getForecast(apiKey, location string) (string, error) {
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "3-day forecast for %s, %s, %s:\n", fr.Location.Name, fr.Location.Region, fr.Location.Country)
+	fmt.Fprintf(&sb, "5-day forecast for %s, %s, %s:\n", fr.Location.Name, fr.Location.Region, fr.Location.Country)
 	for _, d := range fr.Forecast.ForecastDay {
 		fmt.Fprintf(&sb, "  %s: %.1f°C / %.1f°C, %s, rain chance %d%%\n",
 			d.Date, d.Day.MaxTempC, d.Day.MinTempC, d.Day.Condition.Text, d.Day.DailyChanceRain)

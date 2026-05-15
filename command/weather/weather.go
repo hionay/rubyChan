@@ -49,10 +49,6 @@ func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *eve
 		}
 	} else {
 		loc = strings.Join(args, " ")
-		if err := wc.Store.PutString(key, loc); err != nil {
-			cli.SendText(ctx, room, fmt.Sprintf("error saving location: %v", err))
-			return
-		}
 	}
 
 	var reply string
@@ -65,6 +61,14 @@ func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *eve
 		cli.SendText(ctx, room, fmt.Sprintf("error: %v", err))
 		return
 	}
+
+	if len(args) > 0 {
+		if err := wc.Store.PutString(key, loc); err != nil {
+			cli.SendText(ctx, room, fmt.Sprintf("error saving location: %v", err))
+			return
+		}
+	}
+
 	cli.SendText(ctx, room, reply)
 }
 

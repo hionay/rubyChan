@@ -29,7 +29,7 @@ func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *eve
 	user := evt.Sender
 	room := evt.RoomID
 
-	forecast := len(args) > 0 && args[0] == "forecast"
+	forecast := len(args) > 0 && (args[0] == "forecast" || args[0] == "f")
 	if forecast {
 		args = args[1:]
 	}

@@ -20,17 +20,21 @@ type WeatherCmd struct {
 }
 
 func (*WeatherCmd) Name() string      { return "weather" }
-func (*WeatherCmd) Aliases() []string { return []string{"w"} }
+func (*WeatherCmd) Aliases() []string { return []string{"w", "wf"} }
 func (*WeatherCmd) Usage() string {
-	return "!weather [location] — Show current weather for [location], or last used by you\n!weather forecast [location] — Show 3-day forecast"
+	return "!weather [location] — Show current weather for [location], or last used by you\n!weather forecast [location] — Show 3-day forecast\n!wf [location] — Alias for !weather forecast"
 }
 
 func (wc *WeatherCmd) Execute(ctx context.Context, cli *mautrix.Client, evt *event.Event, args []string) {
 	user := evt.Sender
 	room := evt.RoomID
 
+	raw := strings.TrimSpace(evt.Content.AsMessage().Body)
 	forecast := len(args) > 0 && (args[0] == "forecast" || args[0] == "f")
-	if forecast {
+	if !forecast && (raw == "!wf" || strings.HasPrefix(raw, "!wf ")) {
+		forecast = true
+	}
+	if forecast && len(args) > 0 && (args[0] == "forecast" || args[0] == "f") {
 		args = args[1:]
 	}
 

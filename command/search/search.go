@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"maunium.net/go/mautrix"
@@ -58,13 +59,12 @@ func (sc *SearchCmd) searchGoogle(query string) (title, link string, err error) 
 		return "", "", fmt.Errorf("Google API key or CX not set")
 	}
 
-	q := strings.ReplaceAll(query, " ", "+")
-	url := fmt.Sprintf(
+	reqURL := fmt.Sprintf(
 		"https://www.googleapis.com/customsearch/v1?q=%s&key=%s&cx=%s&num=1",
-		q, sc.GoogleAPIKey, sc.GoogleCX,
+		url.QueryEscape(query), sc.GoogleAPIKey, sc.GoogleCX,
 	)
 
-	resp, err := http.Get(url)
+	resp, err := http.Get(reqURL)
 	if err != nil {
 		return "", "", err
 	}

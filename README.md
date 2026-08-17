@@ -9,7 +9,7 @@ In time, I'll add more features, but for now, it's just a simple bot.
 ## Features
 
 - `!g <query>` — Google search and return top result
-- `!weather <location>` — Current weather via WeatherAPI.com
+- `!weather <location>` — Current weather via Open-Meteo
 - `!joke` — Random joke via JokeAPI.dev
 - `!calc <expr>` — Evaluate a math expression
 - `!roulette` — Russian roulette (1 in 6 chance)

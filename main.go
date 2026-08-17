@@ -94,7 +94,7 @@ func run(ctx context.Context) error {
 		&reminder.RemindMeCmd{},
 		&roulette.RouletteCmd{Store: rouletteNS},
 		&search.SearchCmd{GoogleAPIKey: cfg.GoogleAPIKey, GoogleCX: cfg.GoogleCX},
-		&weather.WeatherCmd{Store: weatherNS, WeatherAPIKey: cfg.WeatherAPIKey},
+		&weather.WeatherCmd{Store: weatherNS},
 		&repo.RepoCmd{},
 		&fact.FactCmd{},
 		&poll.PollCmd{},

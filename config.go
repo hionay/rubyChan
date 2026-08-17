@@ -13,7 +13,6 @@ const (
 	envMatrixServer   = "MATRIX_SERVER"
 	envGoogleAPIKey   = "GOOGLE_API_KEY"
 	envGoogleCX       = "GOOGLE_CX"
-	envWeatherAPIKey  = "WEATHER_API_KEY"
 	envWebhookAddr    = "WEBHOOK_ADDR"
 	envTenorAPIKey    = "TENOR_API_KEY"
 )
@@ -29,7 +28,6 @@ type Config struct {
 	MatrixPassword string
 	GoogleAPIKey   string
 	GoogleCX       string
-	WeatherAPIKey  string
 	WebhookAddr    string
 	TenorAPIKey    string
 }
@@ -55,7 +53,6 @@ func NewConfig() (*Config, error) {
 
 	googleAPIKey := os.Getenv(envGoogleAPIKey)
 	googleCX := os.Getenv(envGoogleCX)
-	openWeatherAPIKey := os.Getenv(envWeatherAPIKey)
 
 	return &Config{
 		MatrixServer:   matrixServer,
@@ -63,7 +60,6 @@ func NewConfig() (*Config, error) {
 		MatrixPassword: matrixPassword,
 		GoogleAPIKey:   googleAPIKey,
 		GoogleCX:       googleCX,
-		WeatherAPIKey:  openWeatherAPIKey,
 		WebhookAddr:    webhookAddr,
 		TenorAPIKey:    tenorAPIKey,
 	}, nil

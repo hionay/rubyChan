@@ -1,9 +1,11 @@
 package weather
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -231,12 +233,22 @@ func geocodeNominatim(ctx context.Context, location string) (*geoResult, error) 
 
 func getWeatherOfLocation(ctx context.Context, geo *geoResult) (string, error) {
 	q := url.Values{
-		"latitude":        {fmt.Sprintf("%f", geo.Lat)},
-		"longitude":       {fmt.Sprintf("%f", geo.Lon)},
-		"current":         {"temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code"},
+		"latitude":  {fmt.Sprintf("%f", geo.Lat)},
+		"longitude": {fmt.Sprintf("%f", geo.Lon)},
+		"current":   {"temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code"},
+		// The current block reports only the first model listed, so it stays
+		// best_match; the hourly block carries the candidates to compare it to.
+		"hourly":          {"temperature_2m"},
+		"forecast_hours":  {"6"},
+		"models":          {modelsParam},
 		"wind_speed_unit": {"kmh"},
 		"timezone":        {"auto"},
 	}
+	body, err := fetch(ctx, "https://api.open-meteo.com/v1/forecast?"+q.Encode())
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch weather: %w", err)
+	}
+
 	var res struct {
 		Current struct {
 			Time        string  `json:"time"`
@@ -246,20 +258,22 @@ func getWeatherOfLocation(ctx context.Context, geo *geoResult) (string, error) {
 			WindKph     float64 `json:"wind_speed_10m"`
 			WeatherCode int     `json:"weather_code"`
 		} `json:"current"`
+		Hourly map[string]json.RawMessage `json:"hourly"`
 	}
-	if err := getJSON(ctx, "https://api.open-meteo.com/v1/forecast?"+q.Encode(), &res); err != nil {
-		return "", fmt.Errorf("failed to fetch weather: %w", err)
+	if err := json.Unmarshal(body, &res); err != nil {
+		return "", fmt.Errorf("failed to parse weather response: %w", err)
 	}
 
 	c := res.Current
 	return fmt.Sprintf(
-		"Weather in %s: %.1f°C, feels like %.1f°C, %s, humidity %d%%, wind %.1f kph (Last updated: %s)",
+		"Weather in %s: %.1f°C, feels like %.1f°C, %s, humidity %d%%, wind %.1f kph%s (Last updated: %s)",
 		geo.label(),
 		c.TempC,
 		c.FeelsLikeC,
 		wmoText(c.WeatherCode),
 		c.Humidity,
 		c.WindKph,
+		modelLabel(res.Hourly, "temperature_2m"),
 		strings.Replace(c.Time, "T", " ", 1),
 	), nil
 }
@@ -269,25 +283,38 @@ func getForecast(ctx context.Context, geo *geoResult) (string, error) {
 		"latitude":        {fmt.Sprintf("%f", geo.Lat)},
 		"longitude":       {fmt.Sprintf("%f", geo.Lon)},
 		"daily":           {"weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,snowfall_sum,relative_humidity_2m_mean"},
+		"models":          {modelsParam},
 		"wind_speed_unit": {"kmh"},
 		"forecast_days":   {"3"},
 		"timezone":        {"auto"},
 	}
+	body, err := fetch(ctx, "https://api.open-meteo.com/v1/forecast?"+q.Encode())
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch forecast: %w", err)
+	}
+
+	// Requesting several models suffixes every daily field with the model name.
 	var res struct {
 		Daily struct {
 			Time        []string  `json:"time"`
-			WeatherCode []int     `json:"weather_code"`
-			MaxTempC    []float64 `json:"temperature_2m_max"`
-			MinTempC    []float64 `json:"temperature_2m_min"`
-			PrecipMM    []float64 `json:"precipitation_sum"`
-			ChanceRain  []int     `json:"precipitation_probability_max"`
-			MaxWindKph  []float64 `json:"wind_speed_10m_max"`
-			SnowCM      []float64 `json:"snowfall_sum"`
-			Humidity    []int     `json:"relative_humidity_2m_mean"`
+			WeatherCode []int     `json:"weather_code_best_match"`
+			MaxTempC    []float64 `json:"temperature_2m_max_best_match"`
+			MinTempC    []float64 `json:"temperature_2m_min_best_match"`
+			PrecipMM    []float64 `json:"precipitation_sum_best_match"`
+			ChanceRain  []int     `json:"precipitation_probability_max_best_match"`
+			MaxWindKph  []float64 `json:"wind_speed_10m_max_best_match"`
+			SnowCM      []float64 `json:"snowfall_sum_best_match"`
+			Humidity    []int     `json:"relative_humidity_2m_mean_best_match"`
 		} `json:"daily"`
 	}
-	if err := getJSON(ctx, "https://api.open-meteo.com/v1/forecast?"+q.Encode(), &res); err != nil {
-		return "", fmt.Errorf("failed to fetch forecast: %w", err)
+	var raw struct {
+		Daily map[string]json.RawMessage `json:"daily"`
+	}
+	if err := json.Unmarshal(body, &res); err != nil {
+		return "", fmt.Errorf("failed to parse forecast response: %w", err)
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return "", fmt.Errorf("failed to parse forecast response: %w", err)
 	}
 
 	d := res.Daily
@@ -297,7 +324,7 @@ func getForecast(ctx context.Context, geo *geoResult) (string, error) {
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "3-day forecast for %s:\n", geo.label())
+	fmt.Fprintf(&sb, "3-day forecast for %s%s:\n", geo.label(), modelLabel(raw.Daily, "temperature_2m_max"))
 	for i := range d.Time {
 		line := fmt.Sprintf("  %s: %.0f°C / %.0f°C, %s | Rain %d%% (%.1fmm) | Wind max %.0fkph | Humidity %d%%",
 			d.Time[i],
@@ -315,23 +342,74 @@ func getForecast(ctx context.Context, geo *geoResult) (string, error) {
 	return strings.TrimRight(sb.String(), "\n"), nil
 }
 
+// Open-Meteo's default best_match model picks the best available model per
+// location but never reports which one. Requesting these alongside it lets us
+// name it: whichever candidate returns values identical to best_match is it.
+// Regional models come first so a tie resolves to the higher-resolution one.
+var weatherModels = []struct{ id, name string }{
+	{"icon_seamless", "DWD ICON"},
+	{"metno_seamless", "MET Norway"},
+	{"meteofrance_seamless", "Météo-France"},
+	{"ukmo_seamless", "UK Met Office"},
+	{"knmi_seamless", "KNMI Harmonie"},
+	{"dmi_seamless", "DMI Harmonie"},
+	{"italia_meteo_arpae_icon_2i", "Italia Meteo ARPAE"},
+	{"jma_seamless", "JMA"},
+	{"gem_seamless", "ECCC GEM"},
+	{"bom_access_global", "BOM ACCESS"},
+	{"cma_grapes_global", "CMA GRAPES"},
+	{"gfs_seamless", "NOAA GFS"},
+	{"ecmwf_ifs025", "ECMWF IFS"},
+}
+
+var modelsParam = func() string {
+	ids := []string{"best_match"}
+	for _, m := range weatherModels {
+		ids = append(ids, m.id)
+	}
+	return strings.Join(ids, ",")
+}()
+
+// modelLabel names the model behind best_match by comparing the raw series of
+// the given field. Returns " [DWD ICON]" or "" when nothing matches.
+func modelLabel(block map[string]json.RawMessage, field string) string {
+	best, ok := block[field+"_best_match"]
+	if !ok {
+		return ""
+	}
+	for _, m := range weatherModels {
+		if v, ok := block[field+"_"+m.id]; ok && bytes.Equal(v, best) {
+			return " [" + m.name + "]"
+		}
+	}
+	return ""
+}
+
 func getJSON(ctx context.Context, endpoint string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	body, err := fetch(ctx, endpoint)
 	if err != nil {
 		return err
+	}
+	return json.Unmarshal(body, out)
+}
+
+func fetch(ctx context.Context, endpoint string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
 	}
 	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	return io.ReadAll(resp.Body)
 }
 
 // https://open-meteo.com/en/docs — WMO weather interpretation codes.
